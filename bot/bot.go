@@ -37,11 +37,13 @@ func (b *Bot) Run(ctx context.Context, register func(bh *th.BotHandler)) error {
 	if err != nil {
 		return err
 	}
-	defer bh.Stop()
+	defer func() { _ = bh.Stop() }()
 
 	register(bh)
 	b.log.Info("telegram long-polling started")
-	bh.Start()
+	if err := bh.Start(); err != nil {
+		return err
+	}
 	<-ctx.Done()
 	return nil
 }
