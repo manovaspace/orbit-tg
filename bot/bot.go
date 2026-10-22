@@ -7,28 +7,46 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 
-	"github.com/manovaspace/orbit-tg/message"
+	tg "github.com/manovaspace/orbit-tg"
+	telegoadapter "github.com/manovaspace/orbit-tg/adapter/telego"
 )
 
+// Bot provides high-level bot execution, routing, and messaging.
 type Bot struct {
-	API *telego.Bot
-	Msg *message.Messenger
-	log *slog.Logger
+	API     *telego.Bot
+	Msg     tg.Messenger
+	Adapter *telegoadapter.TelegoAdapter
+	Router  *Router
+	log     *slog.Logger
 }
 
+// New initializes a Bot instance configured with the Telego driver.
 func New(token string, log *slog.Logger) (*Bot, error) {
-	api, err := telego.NewBot(token)
-	if err != nil {
-		return nil, err
-	}
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Bot{API: api, Msg: message.New(api, log), log: log}, nil
+	adapter, err := telegoadapter.New(token, log)
+	if err != nil {
+		return nil, err
+	}
+	return &Bot{
+		API:     adapter.API(),
+		Msg:     adapter,
+		Adapter: adapter,
+		Router:  NewRouter(),
+		log:     log,
+	}, nil
 }
 
-// Run starts long-polling and invokes register to attach handlers.
-func (b *Bot) Run(ctx context.Context, register func(bh *th.BotHandler)) error {
+// HandlerRegistrar is a callback function for attaching custom low-level handlers if needed.
+type HandlerRegistrar func(b *Bot, bh *th.BotHandler)
+
+// Run starts long-polling and routes updates through the Router.
+func (b *Bot) Run(ctx context.Context, registrars ...HandlerRegistrar) error {
+	defer func() {
+		_ = b.Adapter.Close()
+	}()
+
 	updates, err := b.API.UpdatesViaLongPolling(ctx, nil)
 	if err != nil {
 		return err
@@ -39,7 +57,25 @@ func (b *Bot) Run(ctx context.Context, register func(bh *th.BotHandler)) error {
 	}
 	defer func() { _ = bh.Stop() }()
 
-	register(bh)
+	// Attach Router dispatcher
+	bh.Handle(func(thCtx *th.Context, update telego.Update) error {
+		abstractUpdate := telegoadapter.MapUpdate(&update)
+		if abstractUpdate != nil {
+			_, err := b.Router.Dispatch(thCtx, abstractUpdate)
+			if err != nil {
+				b.log.Error("telegram router dispatch error", "error", err, "update_id", update.UpdateID)
+				return err
+			}
+		}
+		return nil
+	})
+
+	for _, reg := range registrars {
+		if reg != nil {
+			reg(b, bh)
+		}
+	}
+
 	b.log.Info("telegram long-polling started")
 	if err := bh.Start(); err != nil {
 		return err

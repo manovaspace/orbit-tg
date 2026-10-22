@@ -1,41 +1,36 @@
 package chat
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/mymmrac/telego"
+	tg "github.com/manovaspace/orbit-tg"
 )
 
-func IsGroup(c telego.Chat) bool {
-	return c.Type == telego.ChatTypeGroup || c.Type == telego.ChatTypeSupergroup
+// IsGroup returns whether the chat is a group or supergroup.
+func IsGroup(c tg.Chat) bool {
+	return c.IsGroup()
 }
 
-func MessageThread(msg telego.Message) int {
-	return msg.MessageThreadID
+// MessageThread extracts the thread/topic ID of a message, if any.
+func MessageThread(msg tg.Message) int {
+	return msg.ThreadID
 }
 
-func CallbackThread(msg telego.MaybeInaccessibleMessage) int {
-	if m, ok := msg.(*telego.Message); ok && m != nil {
-		return m.MessageThreadID
+// CallbackThread extracts the thread/topic ID of the message attached to a callback query.
+func CallbackThread(q tg.CallbackQuery) int {
+	if q.Message != nil {
+		return q.Message.ThreadID
 	}
 	return 0
 }
 
-func CallbackMessageID(msg telego.MaybeInaccessibleMessage) int {
-	if m, ok := msg.(*telego.Message); ok && m != nil {
-		return m.MessageID
+// CallbackMessageID extracts the message ID attached to a callback query.
+func CallbackMessageID(q tg.CallbackQuery) int {
+	if q.Message != nil {
+		return q.Message.ID
 	}
 	return 0
 }
 
-func DisplayName(u telego.User) string {
-	if u.Username != "" {
-		return u.Username
-	}
-	name := strings.TrimSpace(u.FirstName + " " + u.LastName)
-	if name != "" {
-		return name
-	}
-	return fmt.Sprintf("%d", u.ID)
+// DisplayName formats a readable name for a user.
+func DisplayName(u tg.User) string {
+	return u.DisplayName()
 }

@@ -3,9 +3,10 @@ package mention
 import (
 	"strings"
 
-	"github.com/mymmrac/telego"
+	tg "github.com/manovaspace/orbit-tg"
 )
 
+// UTF16Len calculates the UTF-16 code unit length of a string (standard Telegram entity measurement).
 func UTF16Len(s string) int {
 	n := 0
 	for _, r := range s {
@@ -18,16 +19,26 @@ func UTF16Len(s string) int {
 	return n
 }
 
+// LineUTF16Offset computes the UTF-16 code unit offset of a specific line in text.
 func LineUTF16Offset(text string, lineIndex int) int {
 	pos := 0
 	lines := strings.Split(text, "\n")
 	for i := 0; i < lineIndex && i < len(lines); i++ {
-		pos += UTF16Len(lines[i]) + 1
+		pos += UTF16Len(lines[i]) + 1 // +1 for the newline character
 	}
 	return pos
 }
 
-func OnLine(entities []telego.MessageEntity, lineStart, lineEnd int) (*telego.User, bool) {
+// Entity represents an abstract message entity (mention, text_mention, command, etc.).
+type Entity struct {
+	Type   string   `json:"type"`
+	Offset int      `json:"offset"`
+	Length int      `json:"length"`
+	User   *tg.User `json:"user,omitempty"`
+}
+
+// OnLine checks if any text_mention entity is located within the given line offset range.
+func OnLine(entities []Entity, lineStart, lineEnd int) (*tg.User, bool) {
 	for _, e := range entities {
 		if e.Type != "text_mention" || e.User == nil {
 			continue
@@ -37,44 +48,4 @@ func OnLine(entities []telego.MessageEntity, lineStart, lineEnd int) (*telego.Us
 		}
 	}
 	return nil, false
-}
-
-// MatchLine finds the first unconsumed message line whose stripped body equals index,
-// then returns a text_mention user on that line.
-func MatchLine(fullText string, msgLines []string, consumed []bool, entities []telego.MessageEntity, index int, strip func(string) string) (*telego.User, int, bool) {
-	for lineIdx, line := range msgLines {
-		if lineIdx < len(consumed) && consumed[lineIdx] {
-			continue
-		}
-		body := strip(line)
-		got, ok := parseLeadingIndex(body)
-		if !ok || got != index {
-			continue
-		}
-		start := LineUTF16Offset(fullText, lineIdx)
-		end := start + UTF16Len(line)
-		if u, ok := OnLine(entities, start, end); ok {
-			return u, lineIdx, true
-		}
-	}
-	return nil, -1, false
-}
-
-func parseLeadingIndex(line string) (int, bool) {
-	line = strings.TrimSpace(line)
-	i := 0
-	for i < len(line) && line[i] >= '0' && line[i] <= '9' {
-		i++
-	}
-	if i == 0 {
-		return 0, false
-	}
-	n := 0
-	for j := 0; j < i; j++ {
-		n = n*10 + int(line[j]-'0')
-	}
-	if n < 1 {
-		return 0, false
-	}
-	return n, true
 }

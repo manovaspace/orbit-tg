@@ -1,130 +1,178 @@
 package rich
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/mymmrac/telego"
-	tu "github.com/mymmrac/telego/telegoutil"
+	"github.com/manovaspace/orbit-tg/message"
 )
 
-func HTMLEscape(s string) string {
-	return strings.NewReplacer(
-		"&", "&amp;",
-		"<", "&lt;",
-		">", "&gt;",
-	).Replace(s)
-}
-
-func MessageHTML(html string) telego.InputRichMessage {
-	return tu.RichMessageHTML(html)
-}
-
-// Section is a titled bullet list used in notice messages.
+// Section is a titled bullet list used in structured notice messages.
 type Section struct {
 	Title string
 	Items []string
 }
 
-// Notice builds a hierarchical rich message: main heading + optional subsections with bullet lists.
-func Notice(mainTitle string, sections ...Section) telego.InputRichMessage {
-	blocks := []telego.InputRichBlock{
-		tu.RichBlockSectionHeading(tu.RichTextPlain(mainTitle), 2),
-	}
+// Notice builds a hierarchical notice: main heading + optional subsections with bullet lists.
+func Notice(mainTitle string, sections ...Section) string {
+	var b strings.Builder
+	b.WriteString("<b>" + message.HTMLEscape(mainTitle) + "</b>")
+
 	for _, sec := range sections {
 		if len(sec.Items) == 0 {
 			continue
 		}
+		b.WriteString("\n\n")
 		if sec.Title != "" {
-			blocks = append(blocks, tu.RichBlockSectionHeading(tu.RichTextPlain(sec.Title), 3))
+			b.WriteString("<b>" + message.HTMLEscape(sec.Title) + "</b>\n")
 		}
-		blocks = append(blocks, BulletList(sec.Items))
+		b.WriteString(BulletList(sec.Items))
 	}
-	return tu.RichMessage(blocks...)
+
+	return b.String()
 }
 
-func BulletList(items []string) telego.InputRichBlock {
-	paras := make([]telego.RichText, len(items))
-	for i, name := range items {
-		paras[i] = tu.RichTextPlain(name)
+// BulletList builds a bulleted list string (• item).
+func BulletList(items []string) string {
+	if len(items) == 0 {
+		return ""
 	}
-	return BulletListRich(paras...)
+	var lines []string
+	for _, item := range items {
+		lines = append(lines, "• "+message.HTMLEscape(item))
+	}
+	return strings.Join(lines, "\n")
 }
 
-// BulletListRich builds a bullet list from rich-text paragraphs (emoji, bold, etc.).
-func BulletListRich(items ...telego.RichText) telego.InputRichBlock {
-	listItems := make([]telego.InputRichBlockListItem, len(items))
-	for i, text := range items {
-		listItems[i] = tu.RichBlockListItem(tu.RichBlockParagraph(text))
+// NumberedList builds an ordered list string (1. item).
+func NumberedList(items []string) string {
+	if len(items) == 0 {
+		return ""
 	}
-	return tu.RichBlockList(listItems...)
+	var lines []string
+	for i, item := range items {
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, message.HTMLEscape(item)))
+	}
+	return strings.Join(lines, "\n")
 }
 
-// NumberedList builds an ordered list (1. 2. 3. …) without separators between items.
-func NumberedList(items []string) telego.InputRichBlock {
-	listItems := make([]telego.InputRichBlockListItem, len(items))
-	for i, name := range items {
-		listItems[i] = tu.RichBlockListItem(
-			tu.RichBlockParagraph(tu.RichTextPlain(name)),
-		).WithType(telego.OrderedListDecimal).WithValue(i + 1)
+// CodeBlock formats code with an optional language syntax class.
+func CodeBlock(lang, code string) string {
+	escaped := message.HTMLEscape(code)
+	if lang != "" {
+		return fmt.Sprintf(`<pre><code class="language-%s">%s</code></pre>`, message.HTMLEscape(lang), escaped)
 	}
-	return tu.RichBlockList(listItems...)
+	return fmt.Sprintf("<pre>%s</pre>", escaped)
 }
 
-// Builder accumulates rich blocks for custom layouts.
+// Blockquote formats text as a quote, optionally expandable for long messages.
+func Blockquote(text string, expandable bool) string {
+	escaped := message.HTMLEscape(text)
+	if expandable {
+		return fmt.Sprintf("<blockquote expandable>%s</blockquote>", escaped)
+	}
+	return fmt.Sprintf("<blockquote>%s</blockquote>", escaped)
+}
+
+// Bold returns HTML bold text.
+func Bold(text string) string {
+	return "<b>" + message.HTMLEscape(text) + "</b>"
+}
+
+// Italic returns HTML italic text.
+func Italic(text string) string {
+	return "<i>" + message.HTMLEscape(text) + "</i>"
+}
+
+// Code returns inline code.
+func Code(text string) string {
+	return "<code>" + message.HTMLEscape(text) + "</code>"
+}
+
+// Link returns an HTML link.
+func Link(text, url string) string {
+	return fmt.Sprintf(`<a href="%s">%s</a>`, message.HTMLEscape(url), message.HTMLEscape(text))
+}
+
+// Spoiler returns spoiler text.
+func Spoiler(text string) string {
+	return "<tg-spoiler>" + message.HTMLEscape(text) + "</tg-spoiler>"
+}
+
+// Builder accumulates HTML blocks into a structured message.
 type Builder struct {
-	blocks []telego.InputRichBlock
+	parts []string
 }
 
+// NewBuilder initializes an HTML message Builder.
 func NewBuilder() *Builder {
-	return &Builder{}
+	return &Builder{parts: make([]string, 0)}
 }
 
-func (b *Builder) Heading(title string, level int) *Builder {
-	b.blocks = append(b.blocks, tu.RichBlockSectionHeading(tu.RichTextPlain(title), level))
+// Heading adds a bold heading line.
+func (b *Builder) Heading(title string) *Builder {
+	b.parts = append(b.parts, Bold(title))
 	return b
 }
 
-func (b *Builder) ParagraphPlain(text string) *Builder {
-	b.blocks = append(b.blocks, tu.RichBlockParagraph(tu.RichTextPlain(text)))
+// Paragraph adds a plain text paragraph.
+func (b *Builder) Paragraph(text string) *Builder {
+	b.parts = append(b.parts, message.HTMLEscape(text))
 	return b
 }
 
+// ParagraphBold adds a bold text paragraph.
+func (b *Builder) ParagraphBold(text string) *Builder {
+	b.parts = append(b.parts, Bold(text))
+	return b
+}
+
+// ParagraphItalic adds an italic text paragraph.
 func (b *Builder) ParagraphItalic(text string) *Builder {
-	b.blocks = append(b.blocks, tu.RichBlockParagraph(tu.RichTextItalic(tu.RichTextPlain(text))))
+	b.parts = append(b.parts, Italic(text))
 	return b
 }
 
+// BulletList adds a bulleted list.
+func (b *Builder) BulletList(items ...string) *Builder {
+	if len(items) > 0 {
+		b.parts = append(b.parts, BulletList(items))
+	}
+	return b
+}
+
+// NumberedList adds a numbered list.
+func (b *Builder) NumberedList(items ...string) *Builder {
+	if len(items) > 0 {
+		b.parts = append(b.parts, NumberedList(items))
+	}
+	return b
+}
+
+// CodeBlock adds a preformatted code block.
+func (b *Builder) CodeBlock(lang, code string) *Builder {
+	b.parts = append(b.parts, CodeBlock(lang, code))
+	return b
+}
+
+// Blockquote adds a blockquote.
+func (b *Builder) Blockquote(text string, expandable bool) *Builder {
+	b.parts = append(b.parts, Blockquote(text, expandable))
+	return b
+}
+
+// Divider adds a visual separator.
 func (b *Builder) Divider() *Builder {
-	b.blocks = append(b.blocks, tu.RichBlockDivider())
+	b.parts = append(b.parts, "———")
 	return b
 }
 
-func (b *Builder) Bullets(items []string) *Builder {
-	if len(items) > 0 {
-		b.blocks = append(b.blocks, BulletList(items))
-	}
-	return b
+// Build combines all blocks separated by double newlines into Telegram HTML.
+func (b *Builder) Build() string {
+	return strings.Join(b.parts, "\n\n")
 }
 
-func (b *Builder) BulletsRich(items ...telego.RichText) *Builder {
-	if len(items) > 0 {
-		b.blocks = append(b.blocks, BulletListRich(items...))
-	}
-	return b
-}
-
-func (b *Builder) Block(block telego.InputRichBlock) *Builder {
-	b.blocks = append(b.blocks, block)
-	return b
-}
-
-func (b *Builder) Numbered(items []string) *Builder {
-	if len(items) > 0 {
-		b.blocks = append(b.blocks, NumberedList(items))
-	}
-	return b
-}
-
-func (b *Builder) Build() telego.InputRichMessage {
-	return tu.RichMessage(b.blocks...)
+// String implements fmt.Stringer by calling Build().
+func (b *Builder) String() string {
+	return b.Build()
 }
