@@ -20,7 +20,7 @@ var (
 		"code":       true,
 		"pre":        true,
 		"blockquote": true,
-		"tg-spoiler":  true,
+		"tg-spoiler": true,
 		"a":          true,
 		"tg-emoji":   true,
 	}
