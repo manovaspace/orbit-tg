@@ -32,7 +32,48 @@ func MapCallbackQuery(q *telego.CallbackQuery) *tg.CallbackQuery {
 	return infra.MapCallbackQuery(q)
 }
 
+// MapInlineQuery converts a telego.InlineQuery to tg.InlineQuery.
+func MapInlineQuery(q *telego.InlineQuery) *tg.InlineQuery {
+	if q == nil {
+		return nil
+	}
+	var from tg.User
+	if mapped := MapUser(&q.From); mapped != nil {
+		from = *mapped
+	}
+	return &tg.InlineQuery{
+		ID:       q.ID,
+		From:     from,
+		Query:    q.Query,
+		Offset:   q.Offset,
+		ChatType: q.ChatType,
+	}
+}
+
+// MapChosenInlineResult converts a telego.ChosenInlineResult to tg.ChosenInlineResult.
+func MapChosenInlineResult(r *telego.ChosenInlineResult) *tg.ChosenInlineResult {
+	if r == nil {
+		return nil
+	}
+	var from tg.User
+	if mapped := MapUser(&r.From); mapped != nil {
+		from = *mapped
+	}
+	return &tg.ChosenInlineResult{
+		ResultID:        r.ResultID,
+		From:            from,
+		InlineMessageID: r.InlineMessageID,
+		Query:           r.Query,
+	}
+}
+
 // MapUpdate converts a telego.Update to tg.Update.
 func MapUpdate(u *telego.Update) *tg.Update {
-	return infra.MapUpdate(u)
+	mapped := infra.MapUpdate(u)
+	if mapped == nil {
+		return nil
+	}
+	mapped.InlineQuery = MapInlineQuery(u.InlineQuery)
+	mapped.ChosenInlineResult = MapChosenInlineResult(u.ChosenInlineResult)
+	return mapped
 }

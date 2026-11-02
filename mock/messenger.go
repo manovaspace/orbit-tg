@@ -38,35 +38,94 @@ type PinRecord struct {
 	Silent    bool
 }
 
+// PhotoRecord records parameters from a SendPhoto invocation.
+type PhotoRecord struct {
+	ChatID  int64
+	Photo   tg.InputFile
+	Caption string
+	Config  tg.SendConfig
+}
+
+// DocumentRecord records parameters from a SendDocument invocation.
+type DocumentRecord struct {
+	ChatID   int64
+	Document tg.InputFile
+	Caption  string
+	Config   tg.SendConfig
+}
+
+// InlineAnswerRecord records parameters from an AnswerInlineQuery invocation.
+type InlineAnswerRecord struct {
+	QueryID string
+	Results []tg.InlineResult
+	Config  tg.InlineConfig
+}
+
+// ChatActionRecord records parameters from a SendChatAction invocation.
+type ChatActionRecord struct {
+	ChatID int64
+	Action tg.ChatAction
+}
+
+// CommandRecord records parameters from a SetMyCommands invocation.
+type CommandRecord struct {
+	Commands []tg.BotCommand
+	Scope    tg.CommandScope
+}
+
+// MenuButtonRecord records parameters from a SetChatMenuButton invocation.
+type MenuButtonRecord struct {
+	ChatID int64
+	Button tg.MenuButton
+}
+
 // MockMessenger provides a thread-safe in-memory implementation of tg.Messenger.
 type MockMessenger struct {
-	mu           sync.Mutex
-	Sent         []SentRecord
-	Edited       []EditRecord
-	Deleted      []int
-	Callbacks    []CallbackRecord
-	Pinned       []PinRecord
-	Unpinned     []PinRecord
-	NextID       int
-	FailWith     error
-	FailCallback error
-	Closed       bool
+	mu            sync.Mutex
+	Sent          []SentRecord
+	Edited        []EditRecord
+	Deleted       []int
+	Callbacks     []CallbackRecord
+	Pinned        []PinRecord
+	Unpinned      []PinRecord
+	Photos        []PhotoRecord
+	Documents     []DocumentRecord
+	InlineAnswers []InlineAnswerRecord
+	ChatActions   []ChatActionRecord
+	Commands      []CommandRecord
+	MenuButtons   []MenuButtonRecord
+	NextID        int
+	FailWith      error
+	FailCallback  error
+	Closed        bool
 }
 
 // NewMessenger initializes a MockMessenger.
 func NewMessenger() *MockMessenger {
 	return &MockMessenger{
-		NextID:    1000,
-		Sent:      make([]SentRecord, 0),
-		Edited:    make([]EditRecord, 0),
-		Deleted:   make([]int, 0),
-		Callbacks: make([]CallbackRecord, 0),
-		Pinned:    make([]PinRecord, 0),
-		Unpinned:  make([]PinRecord, 0),
+		NextID:        1000,
+		Sent:          make([]SentRecord, 0),
+		Edited:        make([]EditRecord, 0),
+		Deleted:       make([]int, 0),
+		Callbacks:     make([]CallbackRecord, 0),
+		Pinned:        make([]PinRecord, 0),
+		Unpinned:      make([]PinRecord, 0),
+		Photos:        make([]PhotoRecord, 0),
+		Documents:     make([]DocumentRecord, 0),
+		InlineAnswers: make([]InlineAnswerRecord, 0),
+		ChatActions:   make([]ChatActionRecord, 0),
+		Commands:      make([]CommandRecord, 0),
+		MenuButtons:   make([]MenuButtonRecord, 0),
 	}
 }
 
-var _ tg.Messenger = (*MockMessenger)(nil)
+var (
+	_ tg.Messenger      = (*MockMessenger)(nil)
+	_ tg.MediaMessenger = (*MockMessenger)(nil)
+	_ tg.InlineQuerier  = (*MockMessenger)(nil)
+	_ tg.ChatActioner   = (*MockMessenger)(nil)
+	_ tg.CommandSetter  = (*MockMessenger)(nil)
+)
 
 func (m *MockMessenger) SendText(ctx context.Context, chatID int64, text string, opts ...tg.SendOption) (*tg.Message, error) {
 	m.mu.Lock()
@@ -241,6 +300,153 @@ func (m *MockMessenger) Unpin(ctx context.Context, chatID int64, messageID int) 
 	m.Unpinned = append(m.Unpinned, PinRecord{
 		ChatID:    chatID,
 		MessageID: messageID,
+	})
+	return nil
+}
+
+func (m *MockMessenger) SendPhoto(ctx context.Context, chatID int64, photo tg.InputFile, caption string, opts ...tg.SendOption) (*tg.Message, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return nil, m.FailWith
+	}
+
+	cfg := tg.ApplySendOptions(opts...)
+	m.Photos = append(m.Photos, PhotoRecord{
+		ChatID:  chatID,
+		Photo:   photo,
+		Caption: caption,
+		Config:  cfg,
+	})
+
+	m.NextID++
+	return &tg.Message{
+		ID:       m.NextID,
+		Chat:     tg.Chat{ID: chatID},
+		ThreadID: cfg.ThreadID,
+		Date:     time.Now(),
+		Text:     caption,
+	}, nil
+}
+
+func (m *MockMessenger) SendDocument(ctx context.Context, chatID int64, doc tg.InputFile, caption string, opts ...tg.SendOption) (*tg.Message, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return nil, m.FailWith
+	}
+
+	cfg := tg.ApplySendOptions(opts...)
+	m.Documents = append(m.Documents, DocumentRecord{
+		ChatID:   chatID,
+		Document: doc,
+		Caption:  caption,
+		Config:   cfg,
+	})
+
+	m.NextID++
+	return &tg.Message{
+		ID:       m.NextID,
+		Chat:     tg.Chat{ID: chatID},
+		ThreadID: cfg.ThreadID,
+		Date:     time.Now(),
+		Text:     caption,
+	}, nil
+}
+
+func (m *MockMessenger) EditCaption(ctx context.Context, chatID int64, messageID int, caption string, opts ...tg.EditOption) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return m.FailWith
+	}
+
+	m.Edited = append(m.Edited, EditRecord{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Text:      caption,
+		Config:    tg.ApplyEditOptions(opts...),
+	})
+	return nil
+}
+
+func (m *MockMessenger) EditMedia(ctx context.Context, chatID int64, messageID int, media tg.Media, opts ...tg.EditOption) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return m.FailWith
+	}
+
+	m.Edited = append(m.Edited, EditRecord{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Text:      media.Caption,
+		Config:    tg.ApplyEditOptions(opts...),
+	})
+	return nil
+}
+
+func (m *MockMessenger) SendChatAction(ctx context.Context, chatID int64, action tg.ChatAction) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return m.FailWith
+	}
+
+	m.ChatActions = append(m.ChatActions, ChatActionRecord{
+		ChatID: chatID,
+		Action: action,
+	})
+	return nil
+}
+
+func (m *MockMessenger) AnswerInlineQuery(ctx context.Context, queryID string, results []tg.InlineResult, opts ...tg.InlineOption) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return m.FailWith
+	}
+
+	m.InlineAnswers = append(m.InlineAnswers, InlineAnswerRecord{
+		QueryID: queryID,
+		Results: append([]tg.InlineResult(nil), results...),
+		Config:  tg.ApplyInlineOptions(opts...),
+	})
+	return nil
+}
+
+func (m *MockMessenger) SetMyCommands(ctx context.Context, cmds []tg.BotCommand, scope tg.CommandScope) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return m.FailWith
+	}
+
+	m.Commands = append(m.Commands, CommandRecord{
+		Commands: append([]tg.BotCommand(nil), cmds...),
+		Scope:    scope,
+	})
+	return nil
+}
+
+func (m *MockMessenger) SetChatMenuButton(ctx context.Context, chatID int64, button tg.MenuButton) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.FailWith != nil {
+		return m.FailWith
+	}
+
+	m.MenuButtons = append(m.MenuButtons, MenuButtonRecord{
+		ChatID: chatID,
+		Button: button,
 	})
 	return nil
 }

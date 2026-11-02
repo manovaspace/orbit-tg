@@ -20,11 +20,11 @@ var _ tg.Messenger = (*TelegoAdapter)(nil)
 
 // New initializes a TelegoAdapter with a bot token.
 func New(token string, log *slog.Logger) (*TelegoAdapter, error) {
-	inner, err := infra.New(token, log)
+	api, err := telego.NewBot(token, telego.WithRequestConstructor(inlineQueryConstructor{}))
 	if err != nil {
 		return nil, err
 	}
-	return &TelegoAdapter{inner: inner}, nil
+	return NewFromBot(api, log), nil
 }
 
 // NewFromBot wraps an existing *telego.Bot into a TelegoAdapter.

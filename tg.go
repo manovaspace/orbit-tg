@@ -68,9 +68,11 @@ type CallbackQuery struct {
 
 // Update represents an incoming Telegram update.
 type Update struct {
-	ID            int            `json:"id"`
-	Message       *Message       `json:"message,omitempty"`
-	CallbackQuery *CallbackQuery `json:"callback_query,omitempty"`
+	ID                 int                 `json:"id"`
+	Message            *Message            `json:"message,omitempty"`
+	CallbackQuery      *CallbackQuery      `json:"callback_query,omitempty"`
+	InlineQuery        *InlineQuery        `json:"inline_query,omitempty"`
+	ChosenInlineResult *ChosenInlineResult `json:"chosen_inline_result,omitempty"`
 }
 
 // HandlerFunc handles an abstract Telegram update.
