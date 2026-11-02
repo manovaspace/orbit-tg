@@ -149,3 +149,46 @@ func ApplyCallbackOptions(opts ...CallbackOption) CallbackConfig {
 	}
 	return cfg
 }
+
+// InlineConfig holds configuration for answering an inline query.
+type InlineConfig struct {
+	CacheTime  int
+	IsPersonal bool
+	NextOffset string
+}
+
+// InlineOption configures InlineConfig.
+type InlineOption func(*InlineConfig)
+
+// WithInlineCacheTime sets how long Telegram may cache the inline results in
+// seconds. Zero disables caching.
+func WithInlineCacheTime(seconds int) InlineOption {
+	return func(c *InlineConfig) {
+		c.CacheTime = seconds
+	}
+}
+
+// WithInlinePersonal restricts cached results to the user who sent the query.
+func WithInlinePersonal(personal bool) InlineOption {
+	return func(c *InlineConfig) {
+		c.IsPersonal = personal
+	}
+}
+
+// WithInlineNextOffset sets the pagination offset for the next query.
+func WithInlineNextOffset(offset string) InlineOption {
+	return func(c *InlineConfig) {
+		c.NextOffset = offset
+	}
+}
+
+// ApplyInlineOptions compiles an InlineConfig from functional options.
+func ApplyInlineOptions(opts ...InlineOption) InlineConfig {
+	var cfg InlineConfig
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+	return cfg
+}
