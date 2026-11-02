@@ -3,9 +3,50 @@ version: "2"
 linters:
   default: none
   enable:
+    - depguard
     - errcheck
     - govet
     - ineffassign
     - staticcheck
     - unused
-
+  settings:
+    depguard:
+      rules:
+        # The exported root package is the domain: pure Telegram types and the
+        # Messenger port. It imports no Telegram client, HTTP framework or
+        # adapter.
+        tg-domain:
+          files:
+            - "tg.go"
+            - "options.go"
+          deny:
+            - pkg: "github.com/mymmrac/telego"
+              desc: "the domain declares Messenger; telego lives in infrastructure"
+            - pkg: "net/http"
+              desc: "the domain has no HTTP server"
+            - pkg: "os/exec"
+              desc: "the domain is pure and runs no process"
+            - pkg: "github.com/manovaspace/orbit-tg/adapter/telego"
+              desc: "the domain must not depend on an adapter"
+            - pkg: "github.com/manovaspace/orbit-tg/internal/infrastructure"
+              desc: "the domain must not depend on an adapter"
+        # The application layer holds routing, HTML, ephemeral deletion and
+        # command matching without a Telegram client.
+        tg-application:
+          files:
+            - "**/internal/application/**"
+          deny:
+            - pkg: "github.com/mymmrac/telego"
+              desc: "internal/application works on domain types only"
+            - pkg: "net/http"
+              desc: "internal/application has no HTTP server"
+            - pkg: "os/exec"
+              desc: "internal/application runs no process"
+            - pkg: "github.com/manovaspace/orbit-tg/adapter/telego"
+              desc: "internal/application must not depend on an adapter"
+            - pkg: "github.com/manovaspace/orbit-tg/internal/infrastructure"
+              desc: "internal/application must not depend on an adapter"
+            - pkg: "github.com/manovaspace/orbit-tg/bot"
+              desc: "internal/application must not depend on a public adapter package"
+            - pkg: "github.com/manovaspace/orbit-tg/handler"
+              desc: "internal/application must not depend on a public adapter package"

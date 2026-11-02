@@ -17,6 +17,7 @@ go get github.com/manovaspace/orbit-tg@latest
 
 | Import | Role |
 | --- | --- |
+| `.../orbit-tg` | Domain types, `Messenger` port and functional options |
 | `.../orbit-tg/bot` | Long-poll lifecycle + `Messenger` accessor |
 | `.../orbit-tg/message` | Send/edit/delete rich and plain messages |
 | `.../orbit-tg/handler` | telegohandler predicates (`FirstLineCommand`, …) |
@@ -35,6 +36,25 @@ err = tg.Run(ctx, func(bh *telegohandler.BotHandler) {
     bh.HandleMessage(onHelp, handler.FirstLineCommand("help"))
 })
 ```
+
+## Layout
+
+```
+tg.go, options.go                            domain types and the Messenger port
+internal/application/router/                 route predicates and dispatch
+internal/application/handler/                first-line command matcher
+internal/application/html/                   escape, sanitize and chunk HTML
+internal/application/ephemeral/              TTL deletion scheduling
+internal/application/scrub/                  bounded-backoff deletion
+internal/infrastructure/telego/              telego client and update mapper
+adapter/telego/, bot/, message/, handler/    public facades (unchanged API)
+keyboard/, rich/, mention/, chat/            pure public helpers
+```
+
+The domain imports no Telegram client or HTTP framework. Application packages
+work on the domain types only, and the telego driver sits behind the public
+`adapter/telego` facade and the `Messenger` port. The kit runs no database, no
+HTTP server and no event bus.
 
 ## Development
 
