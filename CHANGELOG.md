@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/manovaspace/orbit-tg/compare/v0.2.0...v0.2.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **deps:** upgrade Go to 1.27.4 and patch vulnerable modules ([#27](https://github.com/manovaspace/orbit-tg/issues/27)) ([6bf9d87](https://github.com/manovaspace/orbit-tg/commit/6bf9d8709533f440501692f28696d2e1515b7657))
+
 ## [0.2.0](https://github.com/manovaspace/orbit-tg/compare/v0.1.0...v0.2.0) (2026-11-02)
 
 
