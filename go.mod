@@ -2,7 +2,7 @@ module github.com/manovaspace/orbit-tg
 
 go 1.27.4
 
-require github.com/mymmrac/telego v1.13.0
+require github.com/mymmrac/telego v1.14.0
 
 require (
 	github.com/bytedance/gopkg v0.1.4 // indirect
